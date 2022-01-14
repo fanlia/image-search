@@ -15,22 +15,24 @@ app = Flask(__name__)
 es = Elasticsearch(['elasticsearch'])
 
 index = 'image'
-body = {
-    'mappings': {
-        'properties': {
-            'url': {
-                'type': 'keyword',
-            },
-            'vector': {
-                'type': 'dense_vector',
-                'dims': 2048,
+
+def createIndex():
+    body = {
+        'mappings': {
+            'properties': {
+                'url': {
+                    'type': 'keyword',
+                },
+                'vector': {
+                    'type': 'dense_vector',
+                    'dims': 2048,
+                },
             },
         },
-    },
-}
+    }
 
-if not es.indices.exists(index):
-    es.indices.create(index, body)
+    if not es.indices.exists(index):
+        es.indices.create(index, body)
 
 @app.route('/')
 def search():
@@ -64,6 +66,7 @@ def create():
     url = request.args.get('url')
     if url is None:
         return 'url required', 400
+    createIndex()
 
     body = {
         "query": {
