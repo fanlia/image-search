@@ -1,0 +1,12 @@
+name: image-decoder
+labels:
+  recommended_framework: ''
+  class: 'image'
+  others: ''
+operator: towhee/image-decoder
+init:
+call:
+  input:
+    image_path: str
+  output:
+    image: Image

@@ -1,0 +1,13 @@
+name: 'resnet50-image-embedding'
+labels: 
+  recommended_framework: pytorch1.2.0
+  class: image-embedding
+  others: resnet50
+operator: 'towhee/resnet50-image-embedding'
+init:
+  model_name: str
+call:
+  input:
+    image: towhee.types.Image
+  output:
+    feature_vector: numpy.ndarray

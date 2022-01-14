@@ -1,0 +1,21 @@
+
+version: "3.9"
+services:
+  web:
+    build: .
+    ports:
+      - "5000:5000"
+    depends_on:
+      - "elasticsearch"
+    volumes:
+      - .:/code
+      - ./towhee:/root/.towhee
+      - ./cache:/root/.cache
+    environment:
+      FLASK_ENV: development
+  elasticsearch:
+    image: "elasticsearch:7.16.2"
+    environment:
+      - 'ES_JAVA_OPTS=-Xms256m -Xmx256m'
+      - 'discovery.type=single-node'
+
