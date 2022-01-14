@@ -12,7 +12,8 @@ services:
       - ./towhee:/root/.towhee
       - ./cache:/root/.cache
     environment:
-      FLASK_ENV: development
+      # FLASK_ENV: development
+      FLASK_ENV: production
   elasticsearch:
     image: "elasticsearch:7.16.2"
     environment:
