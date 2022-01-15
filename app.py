@@ -1,4 +1,5 @@
 
+import os
 from elasticsearch import Elasticsearch
 from flask import Flask, jsonify, request
 from towhee import pipeline
@@ -17,22 +18,29 @@ es = Elasticsearch(['elasticsearch'])
 index = 'image'
 
 def createIndex():
-    body = {
-        'mappings': {
-            'properties': {
-                'url': {
-                    'type': 'keyword',
-                },
-                'vector': {
-                    'type': 'dense_vector',
-                    'dims': 2048,
-                },
+    mappings = {
+        'properties': {
+            'url': {
+                'type': 'keyword',
+            },
+            'vector': {
+                'type': 'dense_vector',
+                'dims': 2048,
             },
         },
     }
 
-    if not es.indices.exists(index):
-        es.indices.create(index, body)
+    if not es.indices.exists(index=index):
+        es.indices.create(index=index, mappings=mappings)
+
+def search_by_url(url):
+    query = {
+        "term": {
+            "url": url,
+        }
+    }
+    result = es.search(query=query, index=index, _source=False)
+    return result
 
 @app.route('/')
 def search():
@@ -41,22 +49,20 @@ def search():
         return 'url required', 400
 
     feature = extract_feature(url)
-    body = {
-        "query": {
-            "script_score": {
-                "query": {
-                    "match_all": {}
-                },
-                "script": {
-                    "source": "1 / (l2norm(params.queryVector, doc['vector']) + 1)",
-                    "params": {
-                        "queryVector": feature
-                    }
+    query = {
+        "script_score": {
+            "query": {
+                "match_all": {}
+            },
+            "script": {
+                "source": "1 / (l2norm(params.queryVector, 'vector') + 1)",
+                "params": {
+                    "queryVector": feature
                 }
             }
         }
     }
-    result = es.search(body, index, _source_excludes=['vector'])
+    result = es.search(query=query, index=index, _source_excludes=['vector'])
     urls = list(map(lambda x: x['_source']['url'], result['hits']['hits']))
 
     return jsonify({'result': urls})
@@ -68,14 +74,8 @@ def create():
         return 'url required', 400
     createIndex()
 
-    body = {
-        "query": {
-            "term": {
-                "url": url,
-            }
-        }
-    }
-    result = es.search(body, index, _source=False)
+    result = search_by_url(url)
+
     hits = result['hits']['hits']
 
     feature = extract_feature(url)
@@ -83,13 +83,13 @@ def create():
     if len(hits) > 0:
         id = hits[0]['_id']
         body = { 'doc': { 'vector': feature }}
-        result = es.update(index, id, body)
+        result = es.update(index=index, id=id, body=body)
     else:
         document = {
             'url': url,
             'vector': feature,
         }
-        result = es.index(index, document=document)
+        result = es.index(index=index, document=document)
     return jsonify({'result': result['result']})
 @app.route('/delete')
 def delete():
@@ -97,14 +97,7 @@ def delete():
     if url is None:
         return 'url required', 400
 
-    body = {
-        "query": {
-            "term": {
-                "url": url,
-            }
-        }
-    }
-    result = es.search(body, index, _source=False)
+    result = search_by_url(url)
     hits = result['hits']['hits']
 
     feature = extract_feature(url)
@@ -113,5 +106,12 @@ def delete():
         return 'url not found', 400
 
     id = hits[0]['_id']
-    result = es.delete(index, id)
+    result = es.delete(index=index, id=id)
     return jsonify({'result': result['result']})
+
+if __name__ == "__main__":
+    if os.getenv('FLASK_ENV') == 'production':
+        from waitress import serve
+        serve(app, host='0.0.0.0', port=5000)
+    else:
+        app.run(host='0.0.0.0', port=5000, debug=True)
